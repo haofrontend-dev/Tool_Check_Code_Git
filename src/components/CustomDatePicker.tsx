@@ -78,8 +78,8 @@ export default function CustomDatePicker({ label, value, onChange }: CustomDateP
                     </div>
 
                     <div className="grid grid-cols-7 gap-1 text-center mb-1">
-                        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => (
-                            <span key={d} className="text-[8px] font-bold text-slate-600">{d}</span>
+                        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => (
+                            <span key={`${d}-${i}`} className="text-[8px] font-bold text-slate-600">{d}</span>
                         ))}
                     </div>
 
