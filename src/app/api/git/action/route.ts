@@ -18,8 +18,8 @@ export async function POST(request: Request) {
 
         let pushResult = null;
         if (push) {
-            // Push to current branch
-            pushResult = await git.push();
+            // Push to current branch and set upstream automatically for new branches
+            pushResult = await git.push(['-u', 'origin', 'HEAD']);
         }
 
         return NextResponse.json({
