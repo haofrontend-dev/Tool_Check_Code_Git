@@ -7,31 +7,60 @@ export async function POST(request: Request) {
         const git = simpleGit(projectPath);
 
         let diffOptions = [];
-        if (from && to) {
+        if (from && to && from !== to) {
             diffOptions.push(`${from}..${to}`);
-        } else {
-            // If no branches, maybe use date/author filtering for logs then diff?
-            // Git diff doesn't directly support --author. We usually diff branches.
-            // But we can get files changed in commits by authors in date range.
-            const logOptions: any = {
-                '--name-only': null,
-            };
-            if (startDate) logOptions['--since'] = startDate;
-            if (endDate) logOptions['--until'] = endDate;
+        } else if (startDate || endDate || (authors && authors.length > 0)) {
+            // Find commit range based on filters
+            const args: string[] = [];
+            if (from) args.push(from);
+            if (startDate) args.push(`--since=${startDate} 00:00:00`);
+            if (endDate) args.push(`--until=${endDate} 23:59:59`);
 
-            const logs = await git.log(logOptions);
-            // Filter logs by authors if provided
+            console.log(`[Diff API] Project: ${projectPath}`);
+            console.log(`[Diff API] Executing: git log ${args.join(' ')}`);
+
+            const logs = await git.log(args);
             let filteredCommits = logs.all;
+
+            console.log(`[Diff API] Found ${logs.total} total commits in time range.`);
+
             if (authors && authors.length > 0) {
-                filteredCommits = logs.all.filter((c: any) =>
-                    authors.includes(`${c.authorName} <${c.authorEmail}>`)
-                );
+                // Flatten and clean the authors list
+                const cleanAuthors = authors.flatMap((a: string) => a.split(/[\n\r]+/)).map((a: string) => a.trim()).filter(Boolean);
+                console.log(`[Diff API] Cleaned authors to match:`, cleanAuthors);
+
+                filteredCommits = logs.all.filter((c: any) => {
+                    const name = c.author_name || c.authorName || 'Unknown';
+                    const email = c.author_email || c.authorEmail || 'unknown';
+                    const authorStr = `${name} <${email}>`;
+                    const isMatch = cleanAuthors.includes(authorStr);
+                    if (!isMatch) console.log(`[Diff API] No match for: "${authorStr}"`);
+                    return isMatch;
+                });
+                console.log(`[Diff API] Found ${filteredCommits.length} commits after author filter.`);
             }
 
-            // If we are looking for "changes" in a period, we might want the diff between 
-            // the commit before the period and the last commit in the period.
-            // For now, let's stick to branch-based diff or just all changes by these authors.
+            if (filteredCommits.length > 0) {
+                const newestCommit = filteredCommits[0].hash;
+                const oldestCommit = filteredCommits[filteredCommits.length - 1].hash;
+
+                // Check if oldestCommit has a parent
+                try {
+                    await git.revparse([`${oldestCommit}^`]);
+                    diffOptions.push(`${oldestCommit}^..${newestCommit}`);
+                } catch (e) {
+                    // No parent (root commit), diff against empty tree to get everything
+                    const EMPTY_TREE_HASH = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+                    diffOptions.push(`${EMPTY_TREE_HASH}..${newestCommit}`);
+                }
+                console.log(`[Diff API] Resulting diff range: ${diffOptions[0]}`);
+            } else {
+                console.log(`[Diff API] Status: No matching commits found.`);
+                return NextResponse.json({ files: [], message: 'No matching commits found for this period' });
+            }
         }
+
+
 
         const summary = await git.diffSummary(diffOptions);
 

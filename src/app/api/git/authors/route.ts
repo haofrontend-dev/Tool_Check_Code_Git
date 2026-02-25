@@ -7,19 +7,22 @@ export async function POST(request: Request) {
         const git = simpleGit(projectPath);
 
         // Get authors between dates
-        // git log --since="2024-01-01" --until="2024-01-31" --format="%aN <%aE>"
-        const logOptions: any = {
-            '--format': '%aN <%aE>',
-        };
-        if (startDate) logOptions['--since'] = startDate;
-        if (endDate) logOptions['--until'] = endDate;
+        const args: string[] = [];
+        if (startDate) args.push(`--since=${startDate} 00:00:00`);
+        if (endDate) args.push(`--until=${endDate} 23:59:59`);
 
-        const authorsRaw = await git.log(logOptions);
-        const authorsSet = new Set(authorsRaw.all.map((commit: any) => commit.hash)); // In '--format' mode, simple-git might put the formatted string in 'hash' or 'message'
+        const authorsRaw = await git.log(args);
 
-        // Actually, git.log with custom format might return lines in a specific way.
-        // Let's use raw command for more control if needed, but let's try this first.
-        const uniqueAuthors = Array.from(new Set(authorsRaw.all.map((c: any) => c.hash))).filter(Boolean);
+        // Extract unique strings in format "Name <email>"
+        const uniqueAuthors = Array.from(new Set(
+            authorsRaw.all.map((c: any) => {
+                const name = c.author_name || c.authorName || 'Unknown';
+                const email = c.author_email || c.authorEmail || 'unknown';
+                return `${name} <${email}>`.trim();
+            })
+        )).filter(a => a !== "Unknown <unknown>");
+
+        console.log(`[Authors API] Found ${uniqueAuthors.length} unique authors.`);
 
         return NextResponse.json({ authors: uniqueAuthors });
     } catch (error: any) {
