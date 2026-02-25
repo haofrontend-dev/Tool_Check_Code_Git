@@ -15,7 +15,9 @@ import {
     X,
     Code,
     ChevronDown,
-    Map
+    Map,
+    ArrowRight,
+    ExternalLink
 } from 'lucide-react';
 import CustomSelect from '@/components/CustomSelect';
 import FileTree from '@/components/FileTree';
@@ -52,6 +54,11 @@ function GitOperations() {
     const [selectedFile, setSelectedFile] = useState<string | null>(null);
     const [fileDiff, setFileDiff] = useState<string | null>(null);
     const [diffLoading, setDiffLoading] = useState(false);
+
+    // PR Review State
+    const [isReviewingPR, setIsReviewingPR] = useState(false);
+    const [prComparison, setPrComparison] = useState<any>(null);
+    const [compareLoading, setCompareLoading] = useState(false);
 
     useEffect(() => {
         if (projectPath) {
@@ -167,6 +174,31 @@ function GitOperations() {
         }
     };
 
+    const handleProposePR = async () => {
+        if (!mergeFrom || !toBranch) return;
+        setCompareLoading(true);
+        setIsReviewingPR(true);
+        try {
+            const res = await fetch('/api/git/compare', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    projectPath,
+                    base: toBranch,
+                    head: mergeFrom
+                })
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            setPrComparison(data);
+        } catch (err: any) {
+            setError(err.message);
+            setIsReviewingPR(false);
+        } finally {
+            setCompareLoading(false);
+        }
+    };
+
     if (!projectPath) {
         return (
             <div className="flex-1 flex flex-col items-center justify-center text-slate-600 gap-6">
@@ -267,12 +299,22 @@ function GitOperations() {
                                     placeholder="Select source branch..."
                                     icon={<GitBranch className="w-3.5 h-3.5" />}
                                 />
-                                <button
-                                    onClick={() => mergeFrom && handleGitOp('merge', { from: mergeFrom })}
-                                    className="bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white px-8 py-4 rounded-2xl border border-emerald-500/20 transition-all text-xs font-black uppercase tracking-widest shadow-lg shadow-emerald-500/5 active:scale-95"
-                                >
-                                    Execute Merge
-                                </button>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={handleProposePR}
+                                        disabled={loading || !mergeFrom}
+                                        className="bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white px-6 py-4 rounded-2xl border border-indigo-500/20 transition-all text-[10px] font-black uppercase tracking-[0.1em] shadow-lg active:scale-95 disabled:opacity-50"
+                                    >
+                                        Propose & Review
+                                    </button>
+                                    <button
+                                        onClick={() => mergeFrom && handleGitOp('merge', { from: mergeFrom })}
+                                        disabled={loading || !mergeFrom}
+                                        className="bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white px-6 py-4 rounded-2xl border border-emerald-500/20 transition-all text-[10px] font-black uppercase tracking-[0.1em] shadow-lg active:scale-95 disabled:opacity-50"
+                                    >
+                                        Quick Merge
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -459,6 +501,124 @@ function GitOperations() {
                                     <p className="text-[10px] font-black uppercase tracking-widest">Unable to parse diff</p>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* PR Review Modal */}
+            {isReviewingPR && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center p-8 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="glass-panel w-full max-w-6xl max-h-[90vh] rounded-[40px] shadow-2xl border-indigo-500/20 flex flex-col overflow-hidden animate-in slide-in-from-bottom-8 duration-500">
+                        <div className="flex items-center justify-between p-8 border-b border-slate-800/50 bg-slate-900/40">
+                            <div className="flex items-center gap-6">
+                                <div className="bg-indigo-500/10 p-4 rounded-3xl">
+                                    <GitBranch className="w-6 h-6 text-indigo-400" />
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                    <div className="flex items-center gap-3">
+                                        <span className="bg-slate-800 px-3 py-1 rounded-lg text-xs font-bold text-slate-300">{toBranch}</span>
+                                        <ArrowRight className="w-4 h-4 text-slate-600" />
+                                        <span className="bg-indigo-500/20 px-3 py-1 rounded-lg text-xs font-bold text-indigo-300 border border-indigo-500/30">{mergeFrom}</span>
+                                    </div>
+                                    <h3 className="text-xl font-black text-white tracking-tight">Propose Code Integration</h3>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setIsReviewingPR(false)}
+                                className="p-3 rounded-2xl hover:bg-white/5 text-slate-500 hover:text-white transition-all"
+                            >
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
+
+                        <div className="flex-1 overflow-y-auto p-10 custom-scrollbar bg-slate-950/20">
+                            {compareLoading ? (
+                                <div className="h-full flex flex-col items-center justify-center gap-6 py-20">
+                                    <RefreshCw className="w-10 h-10 animate-spin text-indigo-500" />
+                                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Analyzing Branch Delta...</p>
+                                </div>
+                            ) : prComparison ? (
+                                <div className="flex flex-col gap-10">
+                                    {/* Stats */}
+                                    <div className="grid grid-cols-4 gap-6">
+                                        <div className="bg-slate-900/40 p-6 rounded-[32px] border border-slate-800/50">
+                                            <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest block mb-1">Files Changed</span>
+                                            <span className="text-2xl font-black text-white">{prComparison.summary.files.length}</span>
+                                        </div>
+                                        <div className="bg-emerald-500/5 p-6 rounded-[32px] border border-emerald-500/10">
+                                            <span className="text-[10px] font-black text-emerald-600/60 uppercase tracking-widest block mb-1">Insertions</span>
+                                            <span className="text-2xl font-black text-emerald-400">+{prComparison.summary.insertions}</span>
+                                        </div>
+                                        <div className="bg-rose-500/5 p-6 rounded-[32px] border border-rose-500/10">
+                                            <span className="text-[10px] font-black text-rose-600/60 uppercase tracking-widest block mb-1">Deletions</span>
+                                            <span className="text-2xl font-black text-rose-400">-{prComparison.summary.deletions}</span>
+                                        </div>
+                                        <div className="bg-indigo-500/5 p-6 rounded-[32px] border border-indigo-500/10">
+                                            <span className="text-[10px] font-black text-indigo-600/60 uppercase tracking-widest block mb-1">Status</span>
+                                            <span className="text-2xl font-black text-indigo-400">Ready</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Full Diff */}
+                                    <div className="flex flex-col gap-4">
+                                        <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 flex items-center gap-2">
+                                            <Code className="w-4 h-4" /> Comparison Diff
+                                        </h4>
+                                        <div className="bg-slate-950/60 border border-slate-800/50 rounded-[32px] p-8 font-mono text-xs overflow-x-auto whitespace-pre custom-scrollbar">
+                                            {prComparison.diff.split('\n').map((line: string, i: number) => {
+                                                const isAdd = line.startsWith('+');
+                                                const isDel = line.startsWith('-');
+                                                const isMeta = line.startsWith('@@') || line.startsWith('diff') || line.startsWith('index') || line.startsWith('---') || line.startsWith('+++');
+                                                return (
+                                                    <div
+                                                        key={i}
+                                                        className={`px-4 py-0.5 -mx-4 rounded-sm ${isAdd ? 'bg-emerald-500/10 text-emerald-400 border-l-2 border-emerald-500/50' :
+                                                                isDel ? 'bg-rose-500/10 text-rose-400 border-l-2 border-rose-500/50' :
+                                                                    isMeta ? 'text-indigo-400 opacity-60 font-black tracking-tighter' :
+                                                                        'text-slate-400'
+                                                            }`}
+                                                    >
+                                                        {line}
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : null}
+                        </div>
+
+                        <div className="p-8 border-t border-slate-800/50 bg-slate-900/40 flex items-center justify-between">
+                            <div className="flex items-center gap-4">
+                                {prComparison?.githubUrl && (
+                                    <a
+                                        href={prComparison.githubUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-3 bg-slate-800 hover:bg-slate-700 text-slate-300 px-6 py-4 rounded-2xl transition-all text-[10px] font-black uppercase tracking-widest"
+                                    >
+                                        <ExternalLink className="w-4 h-4" /> Open GitHub PR
+                                    </a>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <button
+                                    onClick={() => setIsReviewingPR(false)}
+                                    className="px-8 py-4 rounded-2xl text-slate-500 hover:text-slate-300 text-[10px] font-black uppercase tracking-widest transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setIsReviewingPR(false);
+                                        handleGitOp('merge', { from: mergeFrom });
+                                    }}
+                                    className="bg-emerald-600 hover:bg-emerald-500 text-white px-10 py-4 rounded-2xl transition-all shadow-lg shadow-emerald-500/20 text-[10px] font-black uppercase tracking-widest active:scale-95"
+                                >
+                                    Confirm Integration
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
