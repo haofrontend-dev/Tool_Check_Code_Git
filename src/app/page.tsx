@@ -22,7 +22,7 @@ export default function Home() {
     const [workspacePath, setWorkspacePath] = useState('/workspace/Project_Web');
     const [projects, setProjects] = useState<any[]>([]);
     const [selectedProject, setSelectedProject] = useState<any>(null);
-    const [projectStats, setProjectStats] = useState<any>(null);
+    const [repoInfo, setRepoInfo] = useState<any>(null);
     const [scanning, setScanning] = useState(false);
     const [error, setError] = useState('');
 
@@ -56,7 +56,7 @@ export default function Home() {
 
     const handleSelectProject = async (project: any) => {
         setSelectedProject(project);
-        setProjectStats(null); // Clear previous stats
+        setRepoInfo(null); // Clear previous stats
         router.push(`/?project=${encodeURIComponent(project.path)}`);
 
         try {
@@ -66,7 +66,7 @@ export default function Home() {
                 body: JSON.stringify({ projectPath: project.path })
             });
             const data = await res.json();
-            if (data.stats) setProjectStats(data.stats);
+            setRepoInfo(data);
         } catch (err) {
             console.error('Failed to fetch project stats', err);
         }
@@ -159,15 +159,15 @@ export default function Home() {
                                         <h2 className="text-5xl font-black text-white tracking-tighter">{selectedProject.name}</h2>
                                     </div>
                                     <div className="flex items-center gap-8">
-                                        {projectStats && (
+                                        {repoInfo?.stats && (
                                             <div className="flex gap-10 mr-8 border-r border-slate-800/50 pr-8">
                                                 <div className="flex flex-col">
                                                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Commits</span>
-                                                    <span className="text-xl font-black text-white">{projectStats.totalCommits}</span>
+                                                    <span className="text-xl font-black text-white">{repoInfo.stats.totalCommits}</span>
                                                 </div>
                                                 <div className="flex flex-col">
                                                     <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest">Authors</span>
-                                                    <span className="text-xl font-black text-white">{projectStats.authorsCount}</span>
+                                                    <span className="text-xl font-black text-white">{repoInfo.stats.authorsCount}</span>
                                                 </div>
                                             </div>
                                         )}
@@ -211,16 +211,24 @@ export default function Home() {
                                 <div className="glass-panel p-6 rounded-3xl border-slate-800/50 flex flex-col gap-4">
                                     <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-500 border-b border-slate-800/40 pb-2">Recent Activity</h3>
                                     <div className="flex-1 flex flex-col gap-3 min-h-0 overflow-y-auto custom-scrollbar">
-                                        {projectStats?.activity?.map((log: any) => (
-                                            <div key={log.hash} className="bg-slate-900/40 p-3 rounded-2xl border border-white/5 flex flex-col gap-1 group hover:border-indigo-500/20 transition-all">
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-[9px] font-black text-indigo-400/60 truncate max-w-[100px]">{log.author_name}</span>
-                                                    <span className="text-[8px] font-mono text-slate-600">{log.hash.slice(0, 7)}</span>
+                                        {repoInfo?.stats?.activity ? (
+                                            repoInfo.stats.activity.map((log: any) => (
+                                                <div key={log.hash} className="bg-slate-900/40 p-3 rounded-2xl border border-white/5 flex flex-col gap-1 group hover:border-indigo-500/20 transition-all text-left">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-[9px] font-black text-indigo-400/60 truncate max-w-[100px]">{log.author_name}</span>
+                                                        <span className="text-[8px] font-mono text-slate-600">{log.hash.slice(0, 7)}</span>
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-300 font-bold truncate">{log.message}</p>
                                                 </div>
-                                                <p className="text-[11px] text-slate-300 font-bold truncate">{log.message}</p>
+                                            ))
+                                        ) : repoInfo?.isRepo === false ? (
+                                            <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-600 italic py-8">
+                                                <div className="bg-slate-800/20 p-4 rounded-full">
+                                                    <GitBranch className="w-6 h-6 opacity-20" />
+                                                </div>
+                                                <p className="text-[9px] font-bold uppercase tracking-widest text-center">No activity<br />(Project not initialized)</p>
                                             </div>
-                                        ))}
-                                        {!projectStats && (
+                                        ) : (
                                             <div className="flex-1 flex flex-col items-center justify-center gap-4 text-slate-600 italic py-8">
                                                 <RefreshCw className="w-6 h-6 opacity-20 animate-spin" />
                                                 <p className="text-[9px] font-bold uppercase tracking-widest">Loading intelligence...</p>
@@ -233,7 +241,9 @@ export default function Home() {
                                     <div className="flex-1 flex flex-col justify-center gap-4 py-4">
                                         <div className="flex items-center justify-between bg-slate-900/40 p-3 rounded-2xl border border-white/5">
                                             <span className="text-xs font-bold text-slate-400 group-hover:text-slate-200 transition-colors">Workspace Status</span>
-                                            {projectStats?.isDirty ? (
+                                            {repoInfo?.isRepo === false ? (
+                                                <span className="text-[10px] font-black uppercase px-2 py-1 rounded-lg bg-slate-800 text-slate-500 border border-slate-700">Unknown</span>
+                                            ) : repoInfo?.stats?.isDirty ? (
                                                 <span className="text-[10px] font-black uppercase px-2 py-1 rounded-lg bg-amber-500/10 text-amber-500 border border-amber-500/20 flex items-center gap-2">
                                                     <div className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div> Dirty
                                                 </span>
@@ -245,7 +255,11 @@ export default function Home() {
                                         </div>
                                         <div className="flex items-center justify-between bg-slate-900/40 p-3 rounded-2xl border border-white/5">
                                             <span className="text-xs font-bold text-slate-400">Git Connectivity</span>
-                                            <span className="text-[10px] font-black uppercase px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">Active</span>
+                                            {repoInfo?.isRepo === false ? (
+                                                <span className="text-[10px] font-black uppercase px-2 py-1 rounded-lg bg-rose-500/10 text-rose-500 border border-rose-500/20">Disconnected</span>
+                                            ) : (
+                                                <span className="text-[10px] font-black uppercase px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-500 border border-indigo-500/20">Active</span>
+                                            )}
                                         </div>
                                     </div>
                                 </div>

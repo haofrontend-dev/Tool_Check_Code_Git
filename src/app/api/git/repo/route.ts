@@ -8,7 +8,11 @@ export async function POST(request: Request) {
 
         const isRepo = await git.checkIsRepo();
         if (!isRepo) {
-            return NextResponse.json({ error: 'Not a git repository' }, { status: 400 });
+            return NextResponse.json({
+                isRepo: false,
+                projectPath,
+                name: projectPath.split('/').pop()
+            });
         }
 
         const branches = await git.branch();
@@ -27,10 +31,14 @@ export async function POST(request: Request) {
         const activityLogs = await git.log({ maxCount: 5 });
         const lastCommit = activityLogs.latest;
 
+        // Resulting Remote URL (Origin)
+        const remoteUrl = await git.remote(['get-url', 'origin']).catch(() => '');
+
         return NextResponse.json({
             branches: branches.all,
             current: branches.current,
             tags: tags.all,
+            remoteUrl: (remoteUrl || '').trim(),
             stats: {
                 totalCommits: parseInt(totalCommits.trim()),
                 authorsCount,

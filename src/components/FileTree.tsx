@@ -76,7 +76,7 @@ const TreeItem = ({ node, onFileClick }: { node: TreeNode, onFileClick?: (path: 
 
     if (isFolder) {
         return (
-            <div className="flex flex-col">
+            <div className="flex flex-col animate-in fade-in slide-in-from-left-2 duration-300">
                 <button
                     onClick={() => setIsOpen(!isOpen)}
                     className="flex items-center gap-2 py-1.5 px-3 rounded-xl hover:bg-white/5 transition-colors group text-left w-full"
@@ -104,7 +104,7 @@ const TreeItem = ({ node, onFileClick }: { node: TreeNode, onFileClick?: (path: 
     return (
         <label
             onClick={() => onFileClick?.(node.path)}
-            className="flex items-center gap-2 py-1.5 px-3 rounded-xl hover:bg-white/5 transition-colors group cursor-pointer"
+            className="flex items-center gap-2 py-1.5 px-3 rounded-xl hover:bg-white/5 transition-colors group cursor-pointer animate-in fade-in slide-in-from-left-2 duration-300"
         >
             <div className="flex items-center gap-2 flex-1 min-w-0">
                 <File className="w-4 h-4 text-slate-500/50" />

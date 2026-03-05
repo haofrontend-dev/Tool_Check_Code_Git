@@ -18,12 +18,12 @@ export async function POST(request: Request) {
             const fullPath = path.join(workspacePath, item);
             if (fs.statSync(fullPath).isDirectory()) {
                 const git = simpleGit(fullPath);
-                if (await git.checkIsRepo()) {
-                    projects.push({
-                        name: item,
-                        path: fullPath
-                    });
-                }
+                const isRepo = await git.checkIsRepo();
+                projects.push({
+                    name: item,
+                    path: fullPath,
+                    isRepo
+                });
             }
         }
 

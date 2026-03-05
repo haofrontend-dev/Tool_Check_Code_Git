@@ -18,7 +18,7 @@ export default function RootLayout({
 }>) {
     return (
         <html lang="en" className="dark" suppressHydrationWarning>
-            <body className={`${inter.className} bg-slate-950 text-slate-200 antialiased h-screen overflow-hidden flex`}>
+            <body suppressHydrationWarning className={`${inter.className} bg-slate-950 text-slate-200 antialiased h-screen overflow-hidden flex`}>
                 <Suspense fallback={<div className="w-20 bg-slate-950/80 border-r border-slate-800/50"></div>}>
                     <SidebarNav />
                 </Suspense>

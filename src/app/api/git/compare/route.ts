@@ -16,6 +16,13 @@ export async function POST(request: Request) {
         // Get full diff
         const diff = await git.diff([`${base}..${head}`]);
 
+        // Ensure the head branch is pushed to origin so the PR link is valid
+        try {
+            await git.push(['-u', 'origin', head]);
+        } catch (e) {
+            console.warn('Failed to push head branch for PR comparison:', e);
+        }
+
         // Get remote info for PR link generation
         const remotes = await git.getRemotes(true);
         const origin = remotes.find(r => r.name === 'origin');
@@ -26,14 +33,18 @@ export async function POST(request: Request) {
             githubUrl = origin.refs.push
                 .replace('git@github.com:', 'https://github.com/')
                 .replace('.git', '');
+
+            // If it still has a colon that isn't part of the protocol, handle it (for some other ssh formats)
+            if (githubUrl.includes('git@')) {
+                githubUrl = githubUrl.replace(':', '/');
+            }
         }
 
         return NextResponse.json({
             base,
             head,
             summary,
-            diff: diff || 'No differences found between these branches.',
-            githubUrl: githubUrl ? `${githubUrl}/compare/${base}...${head}` : ''
+            diff: diff || 'No differences found between these branches.'
         });
     } catch (error: any) {
         console.error('[Compare API Error]', error);
